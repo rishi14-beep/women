@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Women Safety Emergency Alert</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Welcome back</h1>
+      <p class="subtitle">Login to access your emergency dashboard</p>
+
+      <form id="loginForm">
+        <div>
+          <label for="phone">Mobile Number</label>
+          <input type="tel" id="phone" required />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input type="password" id="password" required />
+        </div>
+
+        <button type="submit">Login</button>
+        <div id="message" class="error-message" style="display: none"></div>
+      </form>
+
+      <p class="secondary-link">
+        New user?
+        <a href="register.html">Create an account</a>
+      </p>
+    </div>
+
+    <script>
+      const API_BASE = 'http://localhost:5000/api';
+
+      const form = document.getElementById('loginForm');
+      const messageEl = document.getElementById('message');
+
+      // If already logged in, go to dashboard
+      const existingToken = localStorage.getItem('authToken');
+      if (existingToken) {
+        window.location.href = 'dashboard.html';
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        messageEl.style.display = 'none';
+
+        const payload = {
+          phone: document.getElementById('phone').value.trim(),
+          password: document.getElementById('password').value,
+        };
+
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            messageEl.textContent = data.message || 'Login failed';
+            messageEl.style.display = 'block';
+            return;
+          }
+
+          // Store JWT token and basic user info in localStorage
+          localStorage.setItem('authToken', data.token);
+          localStorage.setItem('userName', data.user?.name || '');
+
+          window.location.href = 'dashboard.html';
+        } catch (err) {
+          messageEl.textContent = 'Network error. Please try again.';
+          messageEl.style.display = 'block';
+        }
+      });
+    </script>
+  </body>
+</html>

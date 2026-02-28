@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - Women Safety Emergency Alert</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="dashboard-header">
+        <div>
+          <h1>Emergency Dashboard</h1>
+          <p class="small" id="welcomeText"></p>
+        </div>
+        <button class="logout-btn" id="logoutBtn">Logout</button>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Emergency Mode</div>
+          <span
+            id="statusBadge"
+            class="badge badge-inactive"
+          >INACTIVE</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="emergencyToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="info-box">
+        <p>
+          When <strong>Emergency Mode</strong> is ON, press the
+          <strong>P key twice quickly</strong> to trigger an emergency alert.
+        </p>
+        <p class="small" style="margin-top: 6px">
+          The system will try to read your GPS location and send an SMS to your
+          registered contacts using Twilio.
+        </p>
+      </div>
+
+      <div class="location-text" id="locationStatus">Location: Not active</div>
+      <div class="location-text" id="infoMessage"></div>
+
+      <div class="info-box" style="margin-top: 14px">
+        <p class="small">
+          Make sure:
+        </p>
+        <ul class="small" style="margin-left: 16px; margin-top: 4px">
+          <li>Location permission is allowed in your browser.</li>
+          <li>Your internet connection is active.</li>
+          <li>Emergency Mode is ON before using the P key trigger.</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="margin-top: 14px">
+        <p class="small" style="margin-bottom: 4px">Live Map View</p>
+        <p class="small" style="margin-bottom: 6px">
+          When an emergency is triggered, your current location will be shown on this
+          map as a Google Maps view.
+        </p>
+        <div id="mapContainer">
+          <iframe
+            id="mapFrame"
+            title="Emergency location map"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            style="border: 0; width: 100%; height: 220px; border-radius: 12px; display: none;"
+          ></iframe>
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top: 14px">
+        <p class="small">
+          Add extra emergency contacts from a future settings page (not fully
+          implemented in this basic version).
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = 'http://localhost:5000/api';
+
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        window.location.href = 'login.html';
+      }
+
+      const welcomeText = document.getElementById('welcomeText');
+      const statusBadge = document.getElementById('statusBadge');
+      const toggle = document.getElementById('emergencyToggle');
+      const locationStatus = document.getElementById('locationStatus');
+      const infoMessage = document.getElementById('infoMessage');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const mapFrame = document.getElementById('mapFrame');
+
+      let emergencyActive = false;
+      let lastPKeyTime = 0;
+      const DOUBLE_PRESS_WINDOW_MS = 600; // allowed time window between key presses
+
+      // Fetch user profile to display name
+      async function loadProfile() {
+        try {
+          const res = await fetch(`${API_BASE}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (!res.ok) {
+            localStorage.removeItem('authToken');
+            window.location.href = 'login.html';
+            return;
+          }
+          const data = await res.json();
+          const name = data.user?.name || localStorage.getItem('userName') || '';
+          welcomeText.textContent = `Logged in as ${name}`;
+        } catch (err) {
+          welcomeText.textContent = 'Logged in';
+        }
+      }
+
+      loadProfile();
+
+      function updateStatusUI() {
+        if (emergencyActive) {
+          statusBadge.textContent = 'ACTIVE';
+          statusBadge.classList.remove('badge-inactive');
+          statusBadge.classList.add('badge-active');
+          infoMessage.textContent = 'Emergency listener is active. Double press P to send an alert.';
+        } else {
+          statusBadge.textContent = 'INACTIVE';
+          statusBadge.classList.remove('badge-active');
+          statusBadge.classList.add('badge-inactive');
+          infoMessage.textContent = '';
+        }
+      }
+
+      toggle.addEventListener('change', () => {
+        emergencyActive = toggle.checked;
+        updateStatusUI();
+      });
+
+      // Logout clears local storage and redirects
+      logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userName');
+        window.location.href = 'login.html';
+      });
+
+      // Listen for simulated power button via P key double press
+      window.addEventListener('keydown', (e) => {
+        if (!emergencyActive) return;
+
+        if (e.key === 'p' || e.key === 'P') {
+          const now = Date.now();
+          if (now - lastPKeyTime <= DOUBLE_PRESS_WINDOW_MS) {
+            // Detected double press
+            triggerEmergency();
+            lastPKeyTime = 0;
+          } else {
+            lastPKeyTime = now;
+          }
+        }
+      });
+
+      // Use browser Geolocation API and send emergency request to server
+      function triggerEmergency() {
+        if (!navigator.geolocation) {
+          infoMessage.textContent = 'Geolocation is not supported in this browser.';
+          return;
+        }
+
+        infoMessage.textContent = 'Getting current location...';
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+            locationStatus.textContent = `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+            infoMessage.textContent = 'Sending emergency alert...';
+
+            // Show map centered on the current location
+            const embedUrl = `https://www.google.com/maps?q=${latitude},${longitude}&z=15&output=embed`;
+            mapFrame.src = embedUrl;
+            mapFrame.style.display = 'block';
+
+            try {
+              const res = await fetch(`${API_BASE}/emergency/trigger`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ latitude, longitude, mapsLink }),
+              });
+
+              const data = await res.json();
+              if (!res.ok) {
+                infoMessage.textContent = data.message || 'Failed to send emergency alert.';
+                return;
+              }
+
+              infoMessage.textContent = data.message || 'Emergency alert sent to your contacts.';
+            } catch (err) {
+              infoMessage.textContent = 'Network error while sending emergency alert.';
+            }
+          },
+          (error) => {
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                infoMessage.textContent = 'Location permission denied. Please enable it.';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                infoMessage.textContent = 'Location information is unavailable.';
+                break;
+              case error.TIMEOUT:
+                infoMessage.textContent = 'Location request timed out.';
+                break;
+              default:
+                infoMessage.textContent = 'An unknown error occurred while fetching location.';
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      }
+
+      // Initialize UI
+      updateStatusUI();
+    </script>
+  </body>
+</html>

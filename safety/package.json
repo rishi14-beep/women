@@ -1,0 +1,23 @@
+{
+  "name": "women-safety-emergency-alert-system",
+  "version": "1.0.0",
+  "description": "Women Safety Emergency Alert System - Node/Express, MongoDB, JWT, Twilio, HTML/CSS/JS",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.6.0",
+    "twilio": "^4.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
